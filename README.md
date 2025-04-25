@@ -50,13 +50,15 @@ This repository houses our CSCI450 group project: the STEM Summer Camp Registrat
 > **Index:** `UNIQUE(camper_id, session_id)` to prevent duplicate sign-ups.
 
 ### notifications
-| Field               | Type                                                  | Attributes                                            |
-| ------------------- | ----------------------------------------------------- | ----------------------------------------------------- |
-| `id`                | INT                                                   | PRIMARY KEY, AUTO_INCREMENT                           |
-| `registration_id`   | INT                                                   | NOT NULL, FOREIGN KEY → `registrations(id)`           |
-| `type`              | ENUM('confirmation','waitlist','availability')        | NOT NULL                                              |
-| `canvas_message_id` | VARCHAR(255)                                          | NULL (stores Canvas notification ID)                  |
-| `sent_at`           | DATETIME                                              | NOT NULL, DEFAULT CURRENT_TIMESTAMP                   |
+| Field             | Type                                                    | Attributes                                           |
+| ----------------- | ------------------------------------------------------- | ---------------------------------------------------- |
+| `id`              | INT                                                     | PRIMARY KEY, AUTO_INCREMENT                          |
+| `registration_id` | INT                                                     | NOT NULL, FOREIGN KEY → `registrations(id)`          |
+| `type`            | ENUM('confirmation','waitlist','availability')          | NOT NULL                                             |
+| `to_email`        | VARCHAR(255)                                            | NOT NULL                                             |
+| `subject`         | VARCHAR(255)                                            | NOT NULL                                             |
+| `html_content`    | TEXT                                                    | NOT NULL                                             |
+| `sent_at`         | DATETIME                                                | NOT NULL, DEFAULT CURRENT_TIMESTAMP                  |
 
 ---
 
