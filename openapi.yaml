@@ -1,0 +1,409 @@
+openapi: 3.0.0
+info:
+  title: STEM Summer Camp Registration API
+  version: 1.0.0
+  description: |
+    REST API for the STEM Summer Camp Registration Tracking System.
+servers:
+  - url: http://localhost:5000/v1
+components:
+  schemas:
+    Family:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        id:
+          type: integer
+          format: int32
+          readOnly: true
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+
+    CampSession:
+      type: object
+      required:
+        - name
+        - start_date
+        - end_date
+        - capacity
+      properties:
+        id:
+          type: integer
+          format: int32
+          readOnly: true
+        name:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        capacity:
+          type: integer
+          format: int32
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+
+    Camper:
+      type: object
+      required:
+        - family_id
+        - first_name
+        - last_name
+      properties:
+        id:
+          type: integer
+          format: int32
+          readOnly: true
+        family_id:
+          type: integer
+          format: int32
+        first_name:
+          type: string
+        last_name:
+          type: string
+        dob:
+          type: string
+          format: date
+          nullable: true
+        gender:
+          type: string
+          enum: ['M','F','Other']
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+
+    Registration:
+      type: object
+      required:
+        - camper_id
+        - session_id
+        - status
+      properties:
+        id:
+          type: integer
+          format: int32
+          readOnly: true
+        camper_id:
+          type: integer
+          format: int32
+        session_id:
+          type: integer
+          format: int32
+        status:
+          type: string
+          enum: ['registered','waitlisted']
+        waitlist_position:
+          type: integer
+          format: int32
+          nullable: true
+        registered_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+
+    Notification:
+      type: object
+      required:
+        - registration_id
+        - type
+      properties:
+        id:
+          type: integer
+          format: int32
+          readOnly: true
+        registration_id:
+          type: integer
+          format: int32
+        type:
+          type: string
+          enum: ['confirmation','waitlist','availability']
+        canvas_message_id:
+          type: string
+          nullable: true
+        sent_at:
+          type: string
+          format: date-time
+          readOnly: true
+
+paths:
+  /families:
+    get:
+      summary: List all families
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Family'
+    post:
+      summary: Create a family
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Family'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Family'
+
+  /families/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+    get:
+      summary: Get a family by ID
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Family'
+    put:
+      summary: Update a family
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Family'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Family'
+    delete:
+      summary: Delete a family
+      responses:
+        '204':
+          description: No Content
+
+  /camp-sessions:
+    get:
+      summary: List all sessions
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CampSession'
+    post:
+      summary: Create a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CampSession'
+      responses:
+        '201':
+          description: Created
+
+  /camp-sessions/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+    get:
+      summary: Get a session by ID
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: Update a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CampSession'
+      responses:
+        '200':
+          description: Updated
+    delete:
+      summary: Delete a session
+      responses:
+        '204':
+          description: No Content
+
+  /campers:
+    get:
+      summary: List all campers
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create a camper
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Camper'
+      responses:
+        '201':
+          description: Created
+
+  /campers/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+    get:
+      summary: Get a camper by ID
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: Update a camper
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Camper'
+      responses:
+        '200':
+          description: Updated
+    delete:
+      summary: Delete a camper
+      responses:
+        '204':
+          description: No Content
+
+  /registrations:
+    get:
+      summary: List all registrations
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create a registration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Registration'
+      responses:
+        '201':
+          description: Created
+
+  /registrations/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+    get:
+      summary: Get a registration by ID
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: Update a registration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Registration'
+      responses:
+        '200':
+          description: Updated
+    delete:
+      summary: Delete a registration
+      responses:
+        '204':
+          description: No Content
+
+  /notifications:
+    get:
+      summary: List all notifications
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create a notification log
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Notification'
+      responses:
+        '201':
+          description: Created
+
+  /notifications/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+    get:
+      summary: Get a notification by ID
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Delete a notification
+      responses:
+        '204':
+          description: No Content
