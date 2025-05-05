@@ -1,0 +1,28 @@
+{
+  "name": "csci450-final-project-frontend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vueuse/core": "^13.1.0",
+    "email-validator": "^2.0.4",
+    "pinia": "^3.0.2",
+    "pluralize": "^8.0.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0",
+    "vuetify": "^3.8.3"
+  },
+  "devDependencies": {
+    "@mdi/font": "^7.4.47",
+    "@vitejs/plugin-vue": "^5.2.3",
+    "sass": "^1.87.0",
+    "sass-loader": "^16.0.5",
+    "vite": "^6.2.4",
+    "vite-plugin-vue-devtools": "^7.7.2"
+  }
+}
