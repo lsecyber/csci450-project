@@ -1,0 +1,676 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <sstream>
+#include "Families.hpp"
+#include "Camper_Session.hpp"
+#include "Campers.hpp"
+#include "Registration.hpp"
+#include "Notification.hpp"
+
+using namespace std;
+
+// --- In-memory Database  ---
+vector<Families> families = {
+    Families(1, "Smith", "smith@example.com", "555-1234"),
+    Families(2, "Johnson", "johnson@example.com", "555-5678"),
+    Families(3, "Williams", "williams@example.com", "")
+};
+
+vector<CampSessions> camp_sessions = {
+    CampSessions(1, "Robotics 101", "2025-06-01", "2025-06-05", 20),
+    CampSessions(2, "Chemistry Lab", "2025-06-10", "2025-06-14", 15),
+    CampSessions(3, "Astronomy Adventures", "2025-07-01", "2025-07-05", 25)
+};
+
+vector<Campers> campers = {
+    Campers(1, 1, "Alice", "Smith"),
+    Campers(2, 2, "Bob", "Johnson"),
+    Campers(3, 1, "Charlie", "Smith"),
+    Campers(4, 3, "Diana", "Williams")
+};
+
+// Initialize camper, dob, and gender to match mock data
+void initialize_campers() {
+    campers[0].setDob("2012-05-17"); campers[0].setGender("F");
+    campers[1].setDob("2011-08-30"); campers[1].setGender("M");
+    campers[2].setDob("2013-02-20"); campers[2].setGender("Other");
+    campers[3].setDob("2010-11-05"); campers[3].setGender("F");
+}
+
+vector<Registrations> registrations = {
+    Registrations(1, 1, 1, RegistrationStatus::Registered),
+    Registrations(2, 2, 1, RegistrationStatus::Waitlisted),
+    Registrations(3, 3, 2, RegistrationStatus::Registered),
+    Registrations(4, 4, 3, RegistrationStatus::Registered)
+};
+
+// Initialize registration data to match mock data
+void initialize_registrations() {
+    registrations[1].setWaitlistPosition(1);
+    registrations[0].setRegisteredDate("2025-05-09T12:00:00");
+    registrations[1].setRegisteredDate("2025-05-09T12:00:00");
+    registrations[2].setRegisteredDate("2025-05-09T12:00:00");
+    registrations[3].setRegisteredDate("2025-05-09T12:00:00");
+}
+
+vector<Notifications> notifications = {
+    Notifications(1, 1, NotificationType::Confirmation),
+    Notifications(2, 2, NotificationType::Waitlist),
+    Notifications(3, 3, NotificationType::Confirmation),
+    Notifications(4, 4, NotificationType::Availability)
+};
+
+// Initialize notification data to match mock data
+void initialize_notifications() {
+    notifications[0].setCanvasMessageId("msg-abc123");
+    notifications[0].setSentDate("2025-05-09T12:00:00");
+    notifications[1].setSentDate("2025-05-09T12:00:00");
+    notifications[2].setCanvasMessageId("msg-def456");
+    notifications[2].setSentDate("2025-05-09T12:00:00");
+    notifications[3].setCanvasMessageId("msg-ghi789");
+    notifications[3].setSentDate("2025-05-09T12:00:00");
+}
+
+// --- Utility Functions (ported from Python) ---
+template<typename T>
+vector<T> apply_search(const vector<T>& items, const string& search) {
+    if (search.empty()) return items;
+    string s = search;
+    transform(s.begin(), s.end(), s.begin(), ::tolower);
+    vector<T> filtered;
+    for (const auto& item : items) {
+        stringstream ss;
+        if constexpr (is_same_v<T, Families>) {
+            ss << item.getId() << " " << item.getName() << " " << item.getEmail() << " " << item.getPhone();
+        } else if constexpr (is_same_v<T, CampSessions>) {
+            ss << item.getId() << " " << item.getName() << " " << item.getStartDate() << " " << item.getEndDate() << " " << item.getCapacity();
+        } else if constexpr (is_same_v<T, Campers>) {
+            ss << item.getId() << " " << item.getFamilyId() << " " << item.getFirstName() << " " << item.getLastName() << " " << item.getDob() << " " << item.getGender();
+        } else if constexpr (is_same_v<T, Registrations>) {
+            ss << item.getId() << " " << item.getCamperId() << " " << item.getSessionId() << " "
+               << (item.getStatus() == RegistrationStatus::Registered ? "Registered" : "Waitlisted") << " "
+               << item.getWaitlistPosition() << " " << item.getRegisteredDate();
+        } else if constexpr (is_same_v<T, Notifications>) {
+            ss << item.getId() << " " << item.getRegistrationId() << " ";
+            switch (item.getType()) {
+                case NotificationType::Confirmation: ss << "Confirmation"; break;
+                case NotificationType::Waitlist: ss << "Waitlist"; break;
+                case NotificationType::Availability: ss << "Availability"; break;
+            }
+            ss << " " << item.getCanvasMessageId() << " " << item.getSentDate();
+        }
+        string item_str = ss.str();
+        transform(item_str.begin(), item_str.end(), item_str.begin(), ::tolower);
+        if (item_str.find(s) != string::npos) {
+            filtered.push_back(item);
+        }
+    }
+    return filtered;
+}
+
+template<typename T>
+vector<T> apply_sort(vector<T> items, const string& sortBy) {
+    if (sortBy.empty()) return items;
+    vector<string> keys;
+    stringstream ss(sortBy);
+    string key;
+    while (getline(ss, key, ',')) {
+        keys.push_back(key);
+    }
+    sort(items.begin(), items.end(), [&keys](const T& a, const T& b) {
+        for (const auto& k : keys) {
+            string a_val, b_val;
+            if constexpr (is_same_v<T, Families>) {
+                if (k == "id") { a_val = to_string(a.getId()); b_val = to_string(b.getId()); }
+                else if (k == "name") { a_val = a.getName(); b_val = b.getName(); }
+                else if (k == "email") { a_val = a.getEmail(); b_val = b.getEmail(); }
+                else if (k == "phone") { a_val = a.getPhone(); b_val = b.getPhone(); }
+                else if (k == "created_at") { a_val = a.getCreatedAt(); b_val = b.getCreatedAt(); }
+                else if (k == "updated_at") { a_val = a.getUpdatedAt(); b_val = b.getUpdatedAt(); }
+            } else if constexpr (is_same_v<T, CampSessions>) {
+                if (k == "id") { a_val = to_string(a.getId()); b_val = to_string(b.getId()); }
+                else if (k == "name") { a_val = a.getName(); b_val = b.getName(); }
+                else if (k == "start_date") { a_val = a.getStartDate(); b_val = b.getStartDate(); }
+                else if (k == "end_date") { a_val = a.getEndDate(); b_val = b.getEndDate(); }
+                else if (k == "capacity") { a_val = to_string(a.getCapacity()); b_val = to_string(b.getCapacity()); }
+            } else if constexpr (is_same_v<T, Campers>) {
+                if (k == "id") { a_val = to_string(a.getId()); b_val = to_string(b.getId()); }
+                else if (k == "family_id") { a_val = to_string(a.getFamilyId()); b_val = to_string(b.getFamilyId()); }
+                else if (k == "first_name") { a_val = a.getFirstName(); b_val = b.getFirstName(); }
+                else if (k == "last_name") { a_val = a.getLastName(); b_val = b.getLastName(); }
+                else if (k == "dob") { a_val = a.getDob(); b_val = b.getDob(); }
+                else if (k == "gender") { a_val = a.getGender(); b_val = b.getGender(); }
+            } else if constexpr (is_same_v<T, Registrations>) {
+                if (k == "id") { a_val = to_string(a.getId()); b_val = to_string(b.getId()); }
+                else if (k == "camper_id") { a_val = to_string(a.getCamperId()); b_val = to_string(b.getCamperId()); }
+                else if (k == "session_id") { a_val = to_string(a.getSessionId()); b_val = to_string(b.getSessionId()); }
+                else if (k == "status") { a_val = a.getStatus() == RegistrationStatus::Registered ? "Registered" : "Waitlisted"; b_val = b.getStatus() == RegistrationStatus::Registered ? "Registered" : "Waitlisted"; }
+                else if (k == "waitlist_position") { a_val = to_string(a.getWaitlistPosition()); b_val = to_string(b.getWaitlistPosition()); }
+                else if (k == "registered_date") { a_val = a.getRegisteredDate(); b_val = b.getRegisteredDate(); }
+            } else if constexpr (is_same_v<T, Notifications>) {
+                if (k == "id") { a_val = to_string(a.getId()); b_val = to_string(b.getId()); }
+                else if (k == "registration_id") { a_val = to_string(a.getRegistrationId()); b_val = to_string(b.getRegistrationId()); }
+                else if (k == "type") {
+                    a_val = a.getType() == NotificationType::Confirmation ? "Confirmation" : (a.getType() == NotificationType::Waitlist ? "Waitlist" : "Availability");
+                    b_val = b.getType() == NotificationType::Confirmation ? "Confirmation" : (b.getType() == NotificationType::Waitlist ? "Waitlist" : "Availability");
+                }
+                else if (k == "canvas_message_id") { a_val = a.getCanvasMessageId(); b_val = b.getCanvasMessageId(); }
+                else if (k == "sent_date") { a_val = a.getSentDate(); b_val = b.getSentDate(); }
+            }
+            if (a_val < b_val) return true;
+            if (a_val > b_val) return false;
+        }
+        return false;
+    });
+    return items;
+}
+
+template<typename T>
+void paginate(const vector<T>& items, int page, int limit) {
+    int total = items.size();
+    int start = (page - 1) * limit;
+    int end = min(start + limit, total);
+    cout << "\nPage " << page << " (Total items: " << total << ")\n";
+    for (int i = start; i < end && i < total; ++i) {
+        const auto& item = items[i];
+        if constexpr (is_same_v<T, Families>) {
+            cout << "ID: " << item.getId() << ", Name: " << item.getName() << ", Email: " << item.getEmail() << ", Phone: " << item.getPhone() << "\n";
+        } else if constexpr (is_same_v<T, CampSessions>) {
+            cout << "ID: " << item.getId() << ", Name: " << item.getName() << ", Dates: " << item.getStartDate() << " to " << item.getEndDate() << ", Capacity: " << item.getCapacity() << "\n";
+        } else if constexpr (is_same_v<T, Campers>) {
+            cout << "ID: " << item.getId() << ", Family ID: " << item.getFamilyId() << ", Name: " << item.getFirstName() << " " << item.getLastName() << ", DOB: " << item.getDob() << ", Gender: " << item.getGender() << "\n";
+        } else if constexpr (is_same_v<T, Registrations>) {
+            cout << "ID: " << item.getId() << ", Camper ID: " << item.getCamperId() << ", Session ID: " << item.getSessionId() << ", Status: " << (item.getStatus() == RegistrationStatus::Registered ? "Registered" : "Waitlisted")
+                 << ", Waitlist Position: " << item.getWaitlistPosition() << ", Registered Date: " << item.getRegisteredDate() << "\n";
+        } else if constexpr (is_same_v<T, Notifications>) {
+            cout << "ID: " << item.getId() << ", Registration ID: " << item.getRegistrationId() << ", Type: ";
+            switch (item.getType()) {
+                case NotificationType::Confirmation: cout << "Confirmation"; break;
+                case NotificationType::Waitlist: cout << "Waitlist"; break;
+                case NotificationType::Availability: cout << "Availability"; break;
+            }
+            cout << ", Canvas Message ID: " << item.getCanvasMessageId() << ", Sent Date: " << item.getSentDate() << "\n";
+        }
+    }
+}
+
+// --- Console Functions ---
+void displayMenu() {
+    cout << "\n=== STEM Summer Camp Registration System ===\n";
+    cout << "1. Add New Family\n";
+    cout << "2. List Families\n";
+    cout << "3. Get Family\n";
+    cout << "4. Update Family\n";
+    cout << "5. Delete Family\n";
+    cout << "6. Add Camper to Family\n";
+    cout << "7. List Campers\n";
+    cout << "8. Get Camper\n";
+    cout << "9. Update Camper\n";
+    cout << "10. Delete Camper\n";
+    cout << "11. Add Camp Session\n";
+    cout << "12. View Available Camp Sessions\n";
+    cout << "13. Get Camp Session\n";
+    cout << "14. Update Camp Session\n";
+    cout << "15. Delete Camp Session\n";
+    cout << "16. Register Camper for Session\n";
+    cout << "17. View Registrations\n";
+    cout << "18. Get Registration\n";
+    cout << "19. Update Registration\n";
+    cout << "20. Delete Registration\n";
+    cout << "21. Add Notification\n";
+    cout << "22. List Notifications\n";
+    cout << "23. Get Notification\n";
+    cout << "24. Delete Notification\n";
+    cout << "25. Exit\n";
+    cout << "Enter your choice: ";
+}
+
+Families addNewFamily() {
+    string name, email, phone;
+    cout << "\nEnter Family Information\n";
+    cout << "Family Name: ";
+    getline(cin >> ws, name);
+    cout << "Email: ";
+    getline(cin, email);
+    cout << "Phone (optional): ";
+    getline(cin, phone);
+    static int id = 4; // Start after mock data
+    return Families(id++, name, email, phone);
+}
+
+Campers addNewCamper() {
+    if (families.empty()) {
+        cout << "Please add a family first.\n";
+        throw runtime_error("No families available.");
+    }
+    cout << "\nAvailable Families:\n";
+    for (const auto& family : families) {
+        cout << "ID: " << family.getId() << " - " << family.getName() << "\n";
+    }
+    int familyId;
+    string firstName, lastName, dob, gender;
+    cout << "Enter Family ID: ";
+    cin >> familyId;
+    cout << "Enter Camper's First Name: ";
+    getline(cin >> ws, firstName);
+    cout << "Enter Camper's Last Name: ";
+    getline(cin, lastName);
+    cout << "Enter Date of Birth (YYYY-MM-DD, optional): ";
+    getline(cin, dob);
+    cout << "Enter Gender (M/F/Other, optional): ";
+    getline(cin, gender);
+    static int camperId = 5; // Start after mock data
+    Campers camper(camperId++, familyId, firstName, lastName);
+    if (!dob.empty()) camper.setDob(dob);
+    if (!gender.empty()) camper.setGender(gender);
+    return camper;
+}
+
+CampSessions addNewSession() {
+    string name, start_date, end_date;
+    int capacity;
+    cout << "\nEnter Camp Session Information\n";
+    cout << "Session Name: ";
+    getline(cin >> ws, name);
+    cout << "Start Date (YYYY-MM-DD): ";
+    getline(cin, start_date);
+    cout << "End Date (YYYY-MM-DD): ";
+    getline(cin, end_date);
+    cout << "Capacity: ";
+    cin >> capacity;
+    static int id = 4; // Start after mock data
+    return CampSessions(id++, name, start_date, end_date, capacity);
+}
+
+Registrations addNewRegistration() {
+    if (campers.empty() || camp_sessions.empty()) {
+        cout << "Please ensure there are campers and sessions available first.\n";
+        throw runtime_error("No campers or sessions available.");
+    }
+    cout << "\nAvailable Campers:\n";
+    for (const auto& camper : campers) {
+        cout << "ID: " << camper.getId() << " - " << camper.getFirstName() << " " << camper.getLastName() << "\n";
+    }
+    cout << "\nAvailable Sessions:\n";
+    for (const auto& session : camp_sessions) {
+        cout << "ID: " << session.getId() << " - " << session.getName() << "\n";
+    }
+    int camperId, sessionId;
+    string status, registered_date;
+    cout << "Enter Camper ID: ";
+    cin >> camperId;
+    cout << "Enter Session ID: ";
+    cin >> sessionId;
+    cout << "Enter Status (Registered/Waitlisted): ";
+    getline(cin >> ws, status);
+    cout << "Enter Registered Date (YYYY-MM-DDTHH:MM:SS, optional): ";
+    getline(cin, registered_date);
+    static int id = 5; // Start after mock data
+    Registrations reg(id++, camperId, sessionId, status == "Registered" ? RegistrationStatus::Registered : RegistrationStatus::Waitlisted);
+    if (!registered_date.empty()) reg.setRegisteredDate(registered_date);
+    if (status == "Waitlisted") {
+        int position;
+        cout << "Enter Waitlist Position (0 for none): ";
+        cin >> position;
+        reg.setWaitlistPosition(position);
+    }
+    return reg;
+}
+
+Notifications addNewNotification() {
+    if (registrations.empty()) {
+        cout << "Please add a registration first.\n";
+        throw runtime_error("No registrations available.");
+    }
+    cout << "\nAvailable Registrations:\n";
+    for (const auto& reg : registrations) {
+        cout << "ID: " << reg.getId() << "\n";
+    }
+    int regId;
+    string type, canvas_message_id, sent_date;
+    cout << "Enter Registration ID: ";
+    cin >> regId;
+    cout << "Enter Notification Type (Confirmation/Waitlist/Availability): ";
+    getline(cin >> ws, type);
+    cout << "Enter Canvas Message ID (optional): ";
+    getline(cin, canvas_message_id);
+    cout << "Enter Sent Date (YYYY-MM-DDTHH:MM:SS, optional): ";
+    getline(cin, sent_date);
+    static int id = 5; // Start after mock data
+    NotificationType ntype = type == "Confirmation" ? NotificationType::Confirmation :
+                             type == "Waitlist" ? NotificationType::Waitlist : NotificationType::Availability;
+    Notifications notification(id++, regId, ntype);
+    if (!canvas_message_id.empty()) notification.setCanvasMessageId(canvas_message_id);
+    if (!sent_date.empty()) notification.setSentDate(sent_date);
+    return notification;
+}
+
+template<typename T>
+void listItems(const vector<T>& items, const string& type) {
+    string search, sortBy;
+    int page, limit;
+    cout << "\nEnter search query (optional, press Enter to skip): ";
+    getline(cin >> ws, search);
+    cout << "Enter sort fields (comma-separated, optional, e.g., id,name): ";
+    getline(cin, sortBy);
+    cout << "Enter page number (1 or higher): ";
+    cin >> page;
+    cout << "Enter items per page (1 or higher): ";
+    cin >> limit;
+    if (page < 1 || limit < 1) {
+        cout << "Invalid page or limit.\n";
+        return;
+    }
+    auto filtered = apply_search(items, search);
+    auto sorted = apply_sort(filtered, sortBy);
+    paginate(sorted, page, limit);
+}
+
+template<typename T>
+void getItem(const vector<T>& items, const string& type) {
+    int id;
+    cout << "\nEnter " << type << " ID: ";
+    cin >> id;
+    for (const auto& item : items) {
+        if constexpr (is_same_v<T, Families>) {
+            if (item.getId() == id) {
+                cout << "ID: " << item.getId() << ", Name: " << item.getName() << ", Email: " << item.getEmail() << ", Phone: " << item.getPhone() << "\n";
+                return;
+            }
+        } else if constexpr (is_same_v<T, CampSessions>) {
+            if (item.getId() == id) {
+                cout << "ID: " << item.getId() << ", Name: " << item.getName() << ", Dates: " << item.getStartDate() << " to " << item.getEndDate() << ", Capacity: " << item.getCapacity() << "\n";
+                return;
+            }
+        } else if constexpr (is_same_v<T, Campers>) {
+            if (item.getId() == id) {
+                cout << "ID: " << item.getId() << ", Family ID: " << item.getFamilyId() << ", Name: " << item.getFirstName() << " " << item.getLastName() << ", DOB: " << item.getDob() << ", Gender: " << item.getGender() << "\n";
+                return;
+            }
+        } else if constexpr (is_same_v<T, Registrations>) {
+            if (item.getId() == id) {
+                cout << "ID: " << item.getId() << ", Camper ID: " << item.getCamperId() << ", Session ID: " << item.getSessionId() << ", Status: " << (item.getStatus() == RegistrationStatus::Registered ? "Registered" : "Waitlisted")
+                     << ", Waitlist Position: " << item.getWaitlistPosition() << ", Registered Date: " << item.getRegisteredDate() << "\n";
+                return;
+            }
+        } else if constexpr (is_same_v<T, Notifications>) {
+            if (item.getId() == id) {
+                cout << "ID: " << item.getId() << ", Registration ID: " << item.getRegistrationId() << ", Type: ";
+                switch (item.getType()) {
+                    case NotificationType::Confirmation: cout << "Confirmation"; break;
+                    case NotificationType::Waitlist: cout << "Waitlist"; break;
+                    case NotificationType::Availability: cout << "Availability"; break;
+                }
+                cout << ", Canvas Message ID: " << item.getCanvasMessageId() << ", Sent Date: " << item.getSentDate() << "\n";
+                return;
+            }
+        }
+    }
+    cout << type << " not found.\n";
+}
+
+template<typename T>
+void updateItem(vector<T>& items, const string& type) {
+    int id;
+    cout << "\nEnter " << type << " ID: ";
+    cin >> id;
+    for (auto& item : items) {
+        if constexpr (is_same_v<T, Families>) {
+            if (item.getId() == id) {
+                string name, email, phone;
+                cout << "Enter new Name: ";
+                getline(cin >> ws, name);
+                cout << "Enter new Email: ";
+                getline(cin, email);
+                cout << "Enter new Phone (optional): ";
+                getline(cin, phone);
+                item.setName(name);
+                item.setEmail(email);
+                item.setPhone(phone);
+                item.setUpdatedAt("2025-05-09T12:00:00");
+                cout << "Family updated successfully!\n";
+                return;
+            }
+        } else if constexpr (is_same_v<T, CampSessions>) {
+            if (item.getId() == id) {
+                string name, start_date, end_date;
+                int capacity;
+                cout << "Enter new Name: ";
+                getline(cin >> ws, name);
+                cout << "Enter new Start Date (YYYY-MM-DD): ";
+                getline(cin, start_date);
+                cout << "Enter new End Date (YYYY-MM-DD): ";
+                getline(cin, end_date);
+                cout << "Enter new Capacity: ";
+                cin >> capacity;
+                item.setName(name);
+                item.setDates(start_date, end_date);
+                item.setCapacity(capacity);
+                cout << "Camp Session updated successfully!\n";
+                return;
+            }
+        } else if constexpr (is_same_v<T, Campers>) {
+            if (item.getId() == id) {
+                string first_name, last_name, dob, gender;
+                cout << "Enter new First Name: ";
+                getline(cin >> ws, first_name);
+                cout << "Enter new Last Name: ";
+                getline(cin, last_name);
+                cout << "Enter new Date of Birth (YYYY-MM-DD, optional): ";
+                getline(cin, dob);
+                cout << "Enter new Gender (M/F/Other, optional): ";
+                getline(cin, gender);
+                item.setNames(first_name, last_name);
+                item.setDob(dob);
+                item.setGender(gender);
+                cout << "Camper updated successfully!\n";
+                return;
+            }
+        } else if constexpr (is_same_v<T, Registrations>) {
+            if (item.getId() == id) {
+                int camper_id, session_id;
+                string status, registered_date;
+                cout << "Enter new Camper ID: ";
+                cin >> camper_id;
+                cout << "Enter new Session ID: ";
+                cin >> session_id;
+                cout << "Enter new Status (Registered/Waitlisted): ";
+                getline(cin >> ws, status);
+                cout << "Enter new Registered Date (YYYY-MM-DDTHH:MM:SS, optional): ";
+                getline(cin, registered_date);
+                item = Registrations(item.getId(), camper_id, session_id, status == "Registered" ? RegistrationStatus::Registered : RegistrationStatus::Waitlisted);
+                if (!registered_date.empty()) item.setRegisteredDate(registered_date);
+                if (status == "Waitlisted") {
+                    int position;
+                    cout << "Enter new Waitlist Position (0 for none): ";
+                    cin >> position;
+                    item.setWaitlistPosition(position);
+                } else {
+                    item.setWaitlistPosition(0);
+                }
+                cout << "Registration updated successfully!\n";
+                return;
+            }
+        } else if constexpr (is_same_v<T, Notifications>) {
+            if (item.getId() == id) {
+                int reg_id;
+                string type, canvas_message_id, sent_date;
+                cout << "Enter new Registration ID: ";
+                cin >> reg_id;
+                cout << "Enter new Notification Type (Confirmation/Waitlist/Availability): ";
+                getline(cin >> ws, type);
+                cout << "Enter new Canvas Message ID (optional): ";
+                getline(cin, canvas_message_id);
+                cout << "Enter new Sent Date (YYYY-MM-DDTHH:MM:SS, optional): ";
+                getline(cin, sent_date);
+                NotificationType ntype = type == "Confirmation" ? NotificationType::Confirmation :
+                                         type == "Waitlist" ? NotificationType::Waitlist : NotificationType::Availability;
+                item = Notifications(item.getId(), reg_id, ntype);
+                if (!canvas_message_id.empty()) item.setCanvasMessageId(canvas_message_id);
+                if (!sent_date.empty()) item.setSentDate(sent_date);
+                cout << "Notification updated successfully!\n";
+                return;
+            }
+        }
+    }
+    cout << type << " not found.\n";
+}
+
+template<typename T>
+void deleteItem(vector<T>& items, const string& type) {
+    int id;
+    cout << "\nEnter " << type << " ID: ";
+    cin >> id;
+    auto it = remove_if(items.begin(), items.end(), [id](const T& item) {
+        if constexpr (is_same_v<T, Families>) return item.getId() == id;
+        else if constexpr (is_same_v<T, CampSessions>) return item.getId() == id;
+        else if constexpr (is_same_v<T, Campers>) return item.getId() == id;
+        else if constexpr (is_same_v<T, Registrations>) return item.getId() == id;
+        else if constexpr (is_same_v<T, Notifications>) return item.getId() == id;
+        return false;
+    });
+    if (it != items.end()) {
+        items.erase(it, items.end());
+        cout << type << " deleted successfully!\n";
+    } else {
+        cout << type << " not found.\n";
+    }
+}
+
+int main() {
+    initialize_campers();
+    initialize_registrations();
+    initialize_notifications();
+    int choice;
+    bool running = true;
+
+    while (running) {
+        displayMenu();
+        cin >> choice;
+        try {
+            switch (choice) {
+                case 1: {
+                    Families newFamily = addNewFamily();
+                    families.push_back(newFamily);
+                    cout << "Family added successfully!\n";
+                    break;
+                }
+                case 2: {
+                    listItems(families, "Family");
+                    break;
+                }
+                case 3: {
+                    getItem(families, "Family");
+                    break;
+                }
+                case 4: {
+                    updateItem(families, "Family");
+                    break;
+                }
+                case 5: {
+                    deleteItem(families, "Family");
+                    break;
+                }
+                case 6: {
+                    Campers newCamper = addNewCamper();
+                    campers.push_back(newCamper);
+                    cout << "Camper added successfully!\n";
+                    break;
+                }
+                case 7: {
+                    listItems(campers, "Camper");
+                    break;
+                }
+                case 8: {
+                    getItem(campers, "Camper");
+                    break;
+                }
+                case 9: {
+                    updateItem(campers, "Camper");
+                    break;
+                }
+                case 10: {
+                    deleteItem(campers, "Camper");
+                    break;
+                }
+                case 11: {
+                    CampSessions newSession = addNewSession();
+                    camp_sessions.push_back(newSession);
+                    cout << "Camp Session added successfully!\n";
+                    break;
+                }
+                case 12: {
+                    listItems(camp_sessions, "Camp Session");
+                    break;
+                }
+                case 13: {
+                    getItem(camp_sessions, "Camp Session");
+                    break;
+                }
+                case 14: {
+                    updateItem(camp_sessions, "Camp Session");
+                    break;
+                }
+                case 15: {
+                    deleteItem(camp_sessions, "Camp Session");
+                    break;
+                }
+                case 16: {
+                    Registrations newRegistration = addNewRegistration();
+                    registrations.push_back(newRegistration);
+                    cout << "Registration successful!\n";
+                    break;
+                }
+                case 17: {
+                    listItems(registrations, "Registration");
+                    break;
+                }
+                case 18: {
+                    getItem(registrations, "Registration");
+                    break;
+                }
+                case 19: {
+                    updateItem(registrations, "Registration");
+                    break;
+                }
+                case 20: {
+                    deleteItem(registrations, "Registration");
+                    break;
+                }
+                case 21: {
+                    Notifications newNotification = addNewNotification();
+                    notifications.push_back(newNotification);
+                    cout << "Notification added successfully!\n";
+                    break;
+                }
+                case 22: {
+                    listItems(notifications, "Notification");
+                    break;
+                }
+                case 23: {
+                    getItem(notifications, "Notification");
+                    break;
+                }
+                case 24: {
+                    deleteItem(notifications, "Notification");
+                    break;
+                }
+                case 25: {
+                    running = false;
+                    cout << "Thank you for using the registration system!\n";
+                    break;
+                }
+                default: {
+                    cout << "Invalid choice. Please try again.\n";
+                    break;
+                }
+            }
+        } catch (const exception& e) {
+            cout << "Error: " << e.what() << "\n";
+        }
+    }
+
+    return 0;
+}
